@@ -1,0 +1,1 @@
+ALTER TABLE `income_sources` ADD `expected_monthly_cents` integer;
