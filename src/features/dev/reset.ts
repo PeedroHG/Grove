@@ -2,12 +2,14 @@ import { db } from '@/db/client';
 import { runSeed } from '@/db/seed';
 import {
   allocationRules,
+  billPayments,
   buckets,
   expenses,
   incomeEvents,
   incomeSources,
   ledgerEntries,
   merchantRules,
+  profile,
   transfers,
 } from '@/db/schema';
 
@@ -18,6 +20,7 @@ import {
  * onboarding/UX during development.
  */
 export async function resetAllData(): Promise<void> {
+  await db.delete(billPayments);
   await db.delete(ledgerEntries);
   await db.delete(expenses);
   await db.delete(incomeEvents);
@@ -26,5 +29,6 @@ export async function resetAllData(): Promise<void> {
   await db.delete(merchantRules);
   await db.delete(incomeSources);
   await db.delete(buckets);
+  await db.delete(profile);
   await runSeed(db);
 }

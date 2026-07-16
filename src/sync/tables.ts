@@ -1,6 +1,7 @@
 import {
   accounts,
   allocationRules,
+  billPayments,
   buckets,
   expenses,
   incomeEvents,
@@ -25,6 +26,7 @@ export const SYNCABLE_TABLES = [
   { name: 'transfers', table: transfers },
   { name: 'ledger_entries', table: ledgerEntries },
   { name: 'merchant_rules', table: merchantRules },
+  { name: 'bill_payments', table: billPayments },
 ] as const;
 
 export type SyncableTableName = (typeof SYNCABLE_TABLES)[number]['name'];

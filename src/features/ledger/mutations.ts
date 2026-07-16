@@ -21,6 +21,28 @@ export interface RecordCashIncomeResult {
 }
 
 /**
+ * Computes (without persisting) how an income of `amountCents` would be split
+ * across buckets — despesas covered first, then percentages on the rest — for
+ * the given source's rules and the current month's funding state. Used both
+ * for the live preview on the Adicionar screen and inside `recordCashIncome`,
+ * so what the user previews is exactly what gets saved.
+ */
+export async function previewIncomeAllocation(
+  amountCents: number,
+  incomeSourceId?: string,
+  reference: Date = new Date(),
+): Promise<Allocation[]> {
+  const rules = incomeSourceId ? await rulesForSource(incomeSourceId) : [];
+  const fixedBucketIds = rules.filter((r) => r.mode === 'fixed').map((r) => r.bucketId);
+  const fundingState = await monthFundingState(fixedBucketIds, currentMonthRange(reference));
+  return allocateIncome(
+    amountCents,
+    rules.map((r) => ({ bucketId: r.bucketId, mode: r.mode, value: r.value })),
+    fundingState,
+  );
+}
+
+/**
  * Manual entry for cash income (dinheiro vivo) — the only recurring manual
  * flow, since bank income arrives via Pluggy in Fase 2. Runs the same
  * `allocateIncome` cascata the webhook will run later, so the narration and
@@ -39,15 +61,7 @@ export async function recordCashIncome(input: RecordCashIncomeInput): Promise<Re
     source: 'cash',
   });
 
-  const rules = input.incomeSourceId ? await rulesForSource(input.incomeSourceId) : [];
-  const fixedBucketIds = rules.filter((r) => r.mode === 'fixed').map((r) => r.bucketId);
-  const fundingState = await monthFundingState(fixedBucketIds, currentMonthRange(occurredAt));
-
-  const allocations = allocateIncome(
-    input.amountCents,
-    rules.map((r) => ({ bucketId: r.bucketId, mode: r.mode, value: r.value })),
-    fundingState,
-  );
+  const allocations = await previewIncomeAllocation(input.amountCents, input.incomeSourceId, occurredAt);
 
   for (const allocation of allocations) {
     await db.insert(ledgerEntries).values({

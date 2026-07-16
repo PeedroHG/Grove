@@ -91,6 +91,7 @@ export const buckets = pgTable(
     physicalLocation: text('physical_location', { enum: ['checking', 'caixinha'] })
       .notNull()
       .default('checking'),
+    dueDay: integer('due_day'),
     sortOrder: integer('sort_order').notNull().default(0),
     archivedAt: timestamp('archived_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -215,6 +216,23 @@ export const merchantRules = pgTable(
   (table) => [
     ownerPolicy('merchant_rules'),
     uniqueIndex('merchant_rules_owner_merchant_key').on(table.userId, table.merchantNormalized),
+  ],
+).enableRLS();
+
+export const billPayments = pgTable(
+  'bill_payments',
+  {
+    id: text('id').primaryKey(),
+    ...ownerScoped,
+    bucketId: text('bucket_id').notNull(),
+    monthKey: text('month_key').notNull(),
+    amountCents: integer('amount_cents').notNull().default(0),
+    paidAt: timestamp('paid_at', { withTimezone: true }).notNull(),
+    ...syncColumns,
+  },
+  (table) => [
+    ownerPolicy('bill_payments'),
+    index('bill_payments_bucket_month_idx').on(table.bucketId, table.monthKey),
   ],
 ).enableRLS();
 

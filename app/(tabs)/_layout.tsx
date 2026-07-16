@@ -1,55 +1,23 @@
 import { Tabs } from 'expo-router';
 
-import { AnimatedLucideTabIcon } from '@/components/ui/AnimatedLucideIcon';
-import { colors } from '@/theme/tokens';
-
+/**
+ * The tab bar is hidden — navigation happens through the quick actions on the
+ * home header, with a back button on each spoke screen (see BackButton). The
+ * Tabs navigator is kept (rather than restructured into a stack) so the
+ * existing routes and deep links keep working unchanged.
+ */
 export default function TabsLayout() {
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarShowLabel: true,
-        tabBarStyle: {
-          backgroundColor: colors.card,
-          borderTopColor: colors.border,
-          borderTopWidth: 1,
-          height: 64,
-          paddingBottom: 8,
-          paddingTop: 8,
-        },
-        tabBarActiveTintColor: colors.textPrimary,
-        tabBarInactiveTintColor: colors.textMuted,
-        tabBarLabelStyle: { fontFamily: 'Onest_500Medium', fontSize: 11 },
+        tabBarStyle: { display: 'none' },
       }}
     >
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Início',
-          tabBarIcon: ({ focused }) => <AnimatedLucideTabIcon name="house" focused={focused} />,
-        }}
-      />
-      <Tabs.Screen
-        name="metas"
-        options={{
-          title: 'Metas',
-          tabBarIcon: ({ focused }) => <AnimatedLucideTabIcon name="target" focused={focused} />,
-        }}
-      />
-      <Tabs.Screen
-        name="relatorios"
-        options={{
-          title: 'Relatórios',
-          tabBarIcon: ({ focused }) => <AnimatedLucideTabIcon name="chart-column" focused={focused} />,
-        }}
-      />
-      <Tabs.Screen
-        name="ajustes"
-        options={{
-          title: 'Ajustes',
-          tabBarIcon: ({ focused }) => <AnimatedLucideTabIcon name="settings" focused={focused} />,
-        }}
-      />
+      <Tabs.Screen name="index" />
+      <Tabs.Screen name="metas" />
+      <Tabs.Screen name="relatorios" />
+      <Tabs.Screen name="ajustes" />
     </Tabs>
   );
 }

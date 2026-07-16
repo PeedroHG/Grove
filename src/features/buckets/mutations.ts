@@ -11,6 +11,7 @@ export interface CreateBucketInput {
   monthlyTargetCents?: number;
   isReserve?: boolean;
   physicalLocation?: 'checking' | 'caixinha';
+  dueDay?: number | null;
   sortOrder?: number;
 }
 
@@ -26,6 +27,7 @@ export async function createBucket(input: CreateBucketInput): Promise<string> {
     monthlyTargetCents: input.monthlyTargetCents ?? null,
     isReserve: input.isReserve ?? false,
     physicalLocation: input.physicalLocation ?? 'checking',
+    dueDay: input.dueDay ?? null,
     sortOrder: input.sortOrder ?? 0,
   });
   return id;

@@ -63,6 +63,8 @@ export const buckets = sqliteTable('buckets', {
   physicalLocation: text('physical_location', { enum: ['checking', 'caixinha'] })
     .notNull()
     .default('checking'),
+  /** Day of month a despesa (bill) is due, 1-31. Null for bolsos/metas. */
+  dueDay: integer('due_day'),
   sortOrder: integer('sort_order').notNull().default(0),
   archivedAt: integer('archived_at', { mode: 'timestamp' }),
   createdAt: integer('created_at', { mode: 'timestamp' })
@@ -189,3 +191,38 @@ export const merchantRules = sqliteTable('merchant_rules', {
     .default(sql`(unixepoch())`),
   ...syncColumns,
 });
+
+/**
+ * Single-row profile (id is always 'me'). Local-only — NOT in the sync
+ * tables — because the avatar is a device file path that wouldn't be
+ * meaningful on another device anyway.
+ */
+export const profile = sqliteTable('profile', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  avatarUri: text('avatar_uri'),
+  updatedAt: integer('updated_at', { mode: 'timestamp' })
+    .notNull()
+    .default(sql`(unixepoch())`),
+});
+
+/**
+ * Per-month paid status for a despesa (conta a pagar). A row here means "this
+ * bill was marked paid for this month" — it's an acknowledgment flag, kept
+ * separate from the ledger so it never double-counts the real expense that
+ * later arrives (manual or via Pluggy). One row per (bucket, month).
+ */
+export const billPayments = sqliteTable(
+  'bill_payments',
+  {
+    id: text('id').primaryKey(),
+    bucketId: text('bucket_id')
+      .notNull()
+      .references(() => buckets.id),
+    monthKey: text('month_key').notNull(),
+    amountCents: integer('amount_cents').notNull().default(0),
+    paidAt: integer('paid_at', { mode: 'timestamp' }).notNull(),
+    ...syncColumns,
+  },
+  (table) => [index('bill_payments_bucket_month_idx').on(table.bucketId, table.monthKey)],
+);

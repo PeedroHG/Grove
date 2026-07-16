@@ -1,14 +1,17 @@
+import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { BackButton } from '@/components/ui/BackButton';
 import { Card } from '@/components/ui/Card';
 import { Chip } from '@/components/ui/Chip';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { SyncSection } from '@/components/settings/SyncSection';
 import { ReconnectSection } from '@/components/settings/ReconnectSection';
 import { MoneyInput } from '@/components/ui/MoneyInput';
+import { bucketType, type BucketType } from '@/features/buckets/classify';
 import { createBucket } from '@/features/buckets/mutations';
 import { useActiveBuckets } from '@/features/buckets/hooks';
 import { colorForIndex, suggestIcon } from '@/features/buckets/palette';
@@ -16,80 +19,129 @@ import { resetAllData } from '@/features/dev/reset';
 import { UNALLOCATED_BUCKET_ID } from '@/shared/engine';
 import { colors, fontFamily, radii, spacing } from '@/theme/tokens';
 
+const GROUP_LABEL: Record<BucketType, string> = {
+  despesa: 'Despesas',
+  bolso: 'Bolsos',
+  meta: 'Metas',
+};
+
+const TYPE_HINT: Record<BucketType, string> = {
+  despesa: 'Conta fixa que você paga todo mês. É coberta primeiro, antes de dividir o resto.',
+  bolso: 'Bolso pro dinheiro que sobra depois das despesas — gasto livre do dia a dia.',
+  meta: 'Objetivo pra guardar dinheiro ao longo do tempo.',
+};
+
+const TYPE_PLACEHOLDER: Record<BucketType, string> = {
+  despesa: 'Nome (ex: internet, aluguel)',
+  bolso: 'Nome (ex: namorada, lanches)',
+  meta: 'Nome (ex: emergência, viagem)',
+};
+
 export default function AjustesScreen() {
   const { data: bucketRows } = useActiveBuckets();
   const buckets = (bucketRows ?? []).filter((b) => b.id !== UNALLOCATED_BUCKET_ID);
 
   const [name, setName] = useState('');
-  const [kind, setKind] = useState<'spending' | 'saving'>('spending');
-  const [fundingType, setFundingType] = useState<'fixed' | 'percentage'>('percentage');
+  const [type, setType] = useState<BucketType>('despesa');
   const [valueCents, setValueCents] = useState<number | null>(null);
+  const [dueDay, setDueDay] = useState('');
   const [isReserve, setIsReserve] = useState(false);
 
   const handleCreate = async () => {
     if (!name.trim()) return;
+    // Map the single user-facing type back onto the (kind, fundingType) pair.
+    const kind = type === 'meta' ? 'saving' : 'spending';
+    const fundingType = type === 'despesa' ? 'fixed' : 'percentage';
+    const parsedDue = Number.parseInt(dueDay, 10);
     await createBucket({
       name: name.trim(),
       color: colorForIndex(buckets.length),
       icon: suggestIcon(name),
       kind,
       fundingType,
-      monthlyTargetCents: fundingType === 'fixed' && valueCents != null ? valueCents : undefined,
-      isReserve: kind === 'saving' && isReserve,
+      // despesa: monthly bill amount. meta (não-reserva): goal target. reserva: none.
+      monthlyTargetCents:
+        (type === 'despesa' || (type === 'meta' && !isReserve)) && valueCents != null ? valueCents : undefined,
+      dueDay: type === 'despesa' && parsedDue >= 1 && parsedDue <= 31 ? parsedDue : undefined,
+      isReserve: type === 'meta' && isReserve,
       sortOrder: buckets.length,
     });
     setName('');
     setValueCents(null);
+    setDueDay('');
     setIsReserve(false);
   };
 
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
     <ScrollView contentContainerStyle={styles.content}>
-      <Text style={styles.title}>Seus bolsos</Text>
-      <View style={styles.chipWrap}>
-        {buckets.map((bucket) => (
-          <Chip key={bucket.id} label={bucket.name} color={bucket.color} icon={bucket.icon as never} />
-        ))}
-        {buckets.length === 0 ? <Text style={styles.emptyText}>Nenhum bolso ainda — crie o primeiro abaixo.</Text> : null}
-      </View>
+      <BackButton title="Ajustes" />
+      <Text style={styles.title}>Despesas, bolsos e metas</Text>
+
+      {(['despesa', 'bolso', 'meta'] as const).map((t) => {
+        const items = buckets.filter((b) => bucketType(b) === t);
+        if (items.length === 0) return null;
+        return (
+          <View key={t} style={styles.groupBlock}>
+            <Text style={styles.groupLabel}>{GROUP_LABEL[t]}</Text>
+            <View style={styles.chipWrap}>
+              {items.map((bucket) => (
+                <Chip key={bucket.id} label={bucket.name} color={bucket.color} icon={bucket.icon as never} />
+              ))}
+            </View>
+          </View>
+        );
+      })}
+      {buckets.length === 0 ? <Text style={styles.emptyText}>Nada criado ainda — crie o primeiro abaixo.</Text> : null}
 
       <Card style={styles.form}>
-        <Text style={styles.formTitle}>Novo bolso</Text>
+        <Text style={styles.formTitle}>Criar novo</Text>
+
+        <View style={styles.segmented}>
+          <SegmentButton label="Despesa" active={type === 'despesa'} onPress={() => setType('despesa')} />
+          <SegmentButton label="Bolso" active={type === 'bolso'} onPress={() => setType('bolso')} />
+          <SegmentButton label="Meta" active={type === 'meta'} onPress={() => setType('meta')} />
+        </View>
+
+        <Text style={styles.typeHint}>{TYPE_HINT[type]}</Text>
+
         <TextInput
           style={styles.input}
-          placeholder="Nome (ex: internet, namorada, guardar)"
+          placeholder={TYPE_PLACEHOLDER[type]}
           placeholderTextColor={colors.textMuted}
           value={name}
           onChangeText={setName}
         />
 
-        <View style={styles.segmented}>
-          <SegmentButton label="Gasto" active={kind === 'spending'} onPress={() => setKind('spending')} />
-          <SegmentButton label="Guardar" active={kind === 'saving'} onPress={() => setKind('saving')} />
-        </View>
-
-        <View style={styles.segmented}>
-          <SegmentButton label="Fixo" active={fundingType === 'fixed'} onPress={() => setFundingType('fixed')} />
-          <SegmentButton
-            label="Porcentagem"
-            active={fundingType === 'percentage'}
-            onPress={() => setFundingType('percentage')}
-          />
-        </View>
-
-        {fundingType === 'fixed' ? (
-          <MoneyInput placeholder="Meta mensal (ex: R$ 100,00)" valueCents={valueCents} onChangeCents={setValueCents} />
+        {type === 'despesa' ? (
+          <>
+            <MoneyInput placeholder="Valor mensal (ex: R$ 100,00)" valueCents={valueCents} onChangeCents={setValueCents} />
+            <TextInput
+              style={styles.input}
+              placeholder="Dia do vencimento (ex: 10) — opcional"
+              placeholderTextColor={colors.textMuted}
+              keyboardType="number-pad"
+              value={dueDay}
+              onChangeText={setDueDay}
+            />
+          </>
         ) : null}
 
-        {kind === 'saving' ? (
-          <Pressable style={styles.checkboxRow} onPress={() => setIsReserve((v) => !v)}>
-            <View style={[styles.checkbox, isReserve && styles.checkboxOn]} />
-            <Text style={styles.checkboxLabel}>Conta no anel de reserva</Text>
-          </Pressable>
+        {type === 'meta' ? (
+          <>
+            <Pressable style={styles.checkboxRow} onPress={() => setIsReserve((v) => !v)}>
+              <View style={[styles.checkbox, isReserve && styles.checkboxOn]}>
+                {isReserve ? <Ionicons name="checkmark" size={13} color={colors.textOnLight} /> : null}
+              </View>
+              <Text style={styles.checkboxLabel}>É reserva (sem valor alvo, guarda pra sempre)</Text>
+            </Pressable>
+            {!isReserve ? (
+              <MoneyInput placeholder="Valor alvo (ex: R$ 3.500,00)" valueCents={valueCents} onChangeCents={setValueCents} />
+            ) : null}
+          </>
         ) : null}
 
-        <PrimaryButton label="Criar bolso" onPress={handleCreate} disabled={!name.trim()} />
+        <PrimaryButton label="Criar" onPress={handleCreate} disabled={!name.trim()} />
       </Card>
 
       <SyncSection />
@@ -148,8 +200,11 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   content: { padding: spacing.lg, paddingTop: spacing.md, gap: spacing.lg, paddingBottom: spacing.xxl * 2 },
   title: { color: colors.textPrimary, fontFamily: fontFamily.semibold, fontSize: 17 },
+  groupBlock: { gap: spacing.sm },
+  groupLabel: { color: colors.textMuted, fontFamily: fontFamily.medium, fontSize: 11, letterSpacing: 0.6 },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   emptyText: { color: colors.textMuted, fontFamily: fontFamily.regular, fontSize: 13 },
+  typeHint: { color: colors.textMuted, fontFamily: fontFamily.regular, fontSize: 12, lineHeight: 17 },
   form: { gap: spacing.sm },
   formTitle: { color: colors.textPrimary, fontFamily: fontFamily.semibold, fontSize: 15, marginBottom: spacing.xs },
   dangerButton: {

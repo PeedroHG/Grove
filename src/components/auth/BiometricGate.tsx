@@ -3,6 +3,7 @@ import { type PropsWithChildren, useCallback, useEffect, useRef, useState } from
 import { AppState, type AppStateStatus, StyleSheet, Text, View } from 'react-native';
 
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
+import { isLockSuppressed } from '@/features/auth/lockSuppression';
 import { colors, fontFamily, spacing } from '@/theme/tokens';
 
 type LockState = 'checking' | 'unavailable' | 'locked' | 'unlocked';
@@ -41,7 +42,9 @@ export function BiometricGate({ children }: PropsWithChildren) {
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (next: AppStateStatus) => {
-      if (appState.current.match(/active/) && next === 'background') {
+      // Don't lock when an in-app flow (e.g. the image picker) sent us to the
+      // background on purpose — otherwise picking a photo bounces to the lock.
+      if (appState.current.match(/active/) && next === 'background' && !isLockSuppressed()) {
         setState((current) => (current === 'unlocked' ? 'locked' : current));
       }
       appState.current = next;

@@ -7,6 +7,8 @@ interface AmountTextProps {
   cents: number;
   size?: 'hero' | 'balance' | 'body';
   style?: TextStyle;
+  /** When true, masks the value (privacy mode). */
+  hidden?: boolean;
 }
 
 const SIZE_STYLES = {
@@ -15,9 +17,13 @@ const SIZE_STYLES = {
   body: { fontSize: 15, fontFamily: fontFamily.semibold },
 } as const;
 
-export function AmountText({ cents, size = 'body', style }: AmountTextProps) {
+export const MONEY_MASK = 'R$ ••••';
+
+export function AmountText({ cents, size = 'body', style, hidden }: AmountTextProps) {
   const color = cents < 0 ? colors.negative : colors.textPrimary;
   return (
-    <Text style={[SIZE_STYLES[size], glow.hero, { color }, style]}>{formatCents(cents)}</Text>
+    <Text style={[SIZE_STYLES[size], glow.hero, { color }, style]}>
+      {hidden ? MONEY_MASK : formatCents(cents)}
+    </Text>
   );
 }

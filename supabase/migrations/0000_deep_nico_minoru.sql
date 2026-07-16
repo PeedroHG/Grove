@@ -26,6 +26,18 @@ CREATE TABLE "allocation_rules" (
 );
 --> statement-breakpoint
 ALTER TABLE "allocation_rules" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
+CREATE TABLE "bill_payments" (
+	"id" text PRIMARY KEY NOT NULL,
+	"user_id" uuid NOT NULL,
+	"bucket_id" text NOT NULL,
+	"month_key" text NOT NULL,
+	"amount_cents" integer DEFAULT 0 NOT NULL,
+	"paid_at" timestamp with time zone NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"deleted_at" timestamp with time zone
+);
+--> statement-breakpoint
+ALTER TABLE "bill_payments" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "buckets" (
 	"id" text PRIMARY KEY NOT NULL,
 	"user_id" uuid NOT NULL,
@@ -37,6 +49,7 @@ CREATE TABLE "buckets" (
 	"monthly_target_cents" integer,
 	"is_reserve" boolean DEFAULT false NOT NULL,
 	"physical_location" text DEFAULT 'checking' NOT NULL,
+	"due_day" integer,
 	"sort_order" integer DEFAULT 0 NOT NULL,
 	"archived_at" timestamp with time zone,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
@@ -149,6 +162,7 @@ CREATE TABLE "transfers" (
 ALTER TABLE "transfers" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 ALTER TABLE "accounts" ADD CONSTRAINT "accounts_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "allocation_rules" ADD CONSTRAINT "allocation_rules_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "bill_payments" ADD CONSTRAINT "bill_payments_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "buckets" ADD CONSTRAINT "buckets_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "expenses" ADD CONSTRAINT "expenses_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "income_events" ADD CONSTRAINT "income_events_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -157,6 +171,7 @@ ALTER TABLE "ledger_entries" ADD CONSTRAINT "ledger_entries_user_id_users_id_fk"
 ALTER TABLE "merchant_rules" ADD CONSTRAINT "merchant_rules_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "push_tokens" ADD CONSTRAINT "push_tokens_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "transfers" ADD CONSTRAINT "transfers_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+CREATE INDEX "bill_payments_bucket_month_idx" ON "bill_payments" USING btree ("bucket_id","month_key");--> statement-breakpoint
 CREATE INDEX "expenses_pluggy_tx_idx" ON "expenses" USING btree ("pluggy_transaction_id");--> statement-breakpoint
 CREATE INDEX "expenses_review_status_idx" ON "expenses" USING btree ("review_status");--> statement-breakpoint
 CREATE INDEX "income_events_pluggy_tx_idx" ON "income_events" USING btree ("pluggy_transaction_id");--> statement-breakpoint
@@ -164,6 +179,7 @@ CREATE INDEX "ledger_entries_bucket_occurred_idx" ON "ledger_entries" USING btre
 CREATE UNIQUE INDEX "merchant_rules_owner_merchant_key" ON "merchant_rules" USING btree ("user_id","merchant_normalized");--> statement-breakpoint
 CREATE POLICY "accounts_owner_only" ON "accounts" AS PERMISSIVE FOR ALL TO public USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());--> statement-breakpoint
 CREATE POLICY "allocation_rules_owner_only" ON "allocation_rules" AS PERMISSIVE FOR ALL TO public USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());--> statement-breakpoint
+CREATE POLICY "bill_payments_owner_only" ON "bill_payments" AS PERMISSIVE FOR ALL TO public USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());--> statement-breakpoint
 CREATE POLICY "buckets_owner_only" ON "buckets" AS PERMISSIVE FOR ALL TO public USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());--> statement-breakpoint
 CREATE POLICY "expenses_owner_only" ON "expenses" AS PERMISSIVE FOR ALL TO public USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());--> statement-breakpoint
 CREATE POLICY "income_events_owner_only" ON "income_events" AS PERMISSIVE FOR ALL TO public USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());--> statement-breakpoint

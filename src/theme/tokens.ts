@@ -14,6 +14,11 @@ export const colors = {
   textOnLight: '#09090b',
   positive: '#4ade80',
   negative: '#f87171',
+  // signature accent (emerald) — used on the hero balance card
+  accent: '#10b981',
+  accentDeep: '#059669',
+  onAccent: '#04241b',
+  onAccentMuted: 'rgba(4, 36, 27, 0.65)',
 } as const;
 
 /** Converts a bucket's solid hex color into its translucent chip background. */

@@ -26,6 +26,12 @@
       "expo-router",
       "expo-local-authentication",
       [
+        "expo-image-picker",
+        {
+          "photosPermission": "O Grove usa suas fotos só pra definir a imagem do seu perfil."
+        }
+      ],
+      [
         "expo-notifications",
         {
           "icon": "./assets/icon.png",

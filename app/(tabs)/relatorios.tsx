@@ -3,6 +3,7 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AmountText } from '@/components/ui/AmountText';
+import { BackButton } from '@/components/ui/BackButton';
 import { Card } from '@/components/ui/Card';
 import { Chip } from '@/components/ui/Chip';
 import { ProgressBar } from '@/components/ui/ProgressBar';
@@ -31,6 +32,7 @@ export default function RelatoriosScreen() {
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
     <ScrollView contentContainerStyle={styles.content}>
+      <BackButton />
       <Text style={styles.title}>Relatório do mês</Text>
       <Text style={styles.subtitle}>{monthLabel}</Text>
 

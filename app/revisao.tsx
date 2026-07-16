@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -28,8 +29,14 @@ export default function RevisaoScreen() {
 
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
-      <ScrollView contentContainerStyle={styles.content}>
+      <View style={styles.topBar}>
+        <Pressable hitSlop={10} onPress={() => router.back()} style={styles.backButton}>
+          <Ionicons name="chevron-back" size={24} color={colors.textPrimary} />
+        </Pressable>
         <Text style={styles.title}>Fila de revisão</Text>
+        <View style={styles.backButton} />
+      </View>
+      <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.explain}>
           Gastos que o Grove puxou do banco mas não teve certeza do bolso. Escolha e confirme —
           da próxima vez que esse estabelecimento aparecer, ele categoriza sozinho.
@@ -67,8 +74,6 @@ export default function RevisaoScreen() {
             </Card>
           ))
         )}
-
-        <PrimaryButton label="Fechar" onPress={() => router.back()} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -76,8 +81,17 @@ export default function RevisaoScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.sm,
+  },
+  backButton: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
   content: { padding: spacing.lg, gap: spacing.md, paddingBottom: spacing.xxl * 2 },
-  title: { color: colors.textPrimary, fontFamily: fontFamily.bold, fontSize: 20 },
+  title: { color: colors.textPrimary, fontFamily: fontFamily.semibold, fontSize: 17 },
   explain: { color: colors.textSecondary, fontFamily: fontFamily.regular, fontSize: 13, lineHeight: 18 },
   item: { gap: spacing.sm },
   itemHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },

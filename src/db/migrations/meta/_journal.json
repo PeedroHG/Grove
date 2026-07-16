@@ -15,6 +15,20 @@
       "when": 1784059206696,
       "tag": "0001_perpetual_dreadnoughts",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1784155823644,
+      "tag": "0002_outgoing_legion",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1784161133968,
+      "tag": "0003_giant_wasp",
+      "breakpoints": true
     }
   ]
 }

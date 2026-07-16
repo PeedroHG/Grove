@@ -6,6 +6,7 @@ import Animated, { SlideInRight, SlideOutLeft, SlideInLeft, SlideOutRight } from
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AnimatedLucideIcon, LUCIDE_ICONS } from '@/components/ui/AnimatedLucideIcon';
+import { AvatarPicker } from '@/components/ui/Avatar';
 import { MoneyInput } from '@/components/ui/MoneyInput';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { StepProgress } from '@/components/ui/StepProgress';
@@ -13,6 +14,8 @@ import { createBucket } from '@/features/buckets/mutations';
 import { colorForIndex, suggestIcon } from '@/features/buckets/palette';
 import { createIncomeSource } from '@/features/incomeSources/mutations';
 import { recordInitialDistribution } from '@/features/ledger/mutations';
+import { pickAvatar, persistAvatar } from '@/features/profile/avatar';
+import { upsertProfile } from '@/features/profile/mutations';
 import { formatCents } from '@/lib/money';
 import { allocateIncome, UNALLOCATED_BUCKET_ID, type AllocationRule } from '@/shared/engine';
 import { colors, fontFamily, radii, spacing } from '@/theme/tokens';
@@ -24,6 +27,7 @@ interface IncomeItem {
 interface FixedItem {
   name: string;
   valueCents: number | null;
+  dueDay: string;
 }
 interface SavingItem {
   name: string;
@@ -31,15 +35,16 @@ interface SavingItem {
   isReserve: boolean;
 }
 
-const STEP_COUNT = 6;
+const STEP_COUNT = 7;
 
 const STEP_ICON: Record<number, keyof typeof LUCIDE_ICONS> = {
   0: 'sparkles',
-  1: 'receipt',
-  2: 'target',
-  3: 'chart-pie',
-  4: 'wallet',
-  5: 'circle-check',
+  1: 'wallet',
+  2: 'receipt',
+  3: 'target',
+  4: 'chart-pie',
+  5: 'flag',
+  6: 'circle-check',
 };
 
 interface PreviewRow {
@@ -63,14 +68,24 @@ export default function OnboardingScreen() {
     setStep((s) => s - 1);
   };
 
+  const [userName, setUserName] = useState('');
+  const [avatarUri, setAvatarUri] = useState<string | null>(null);
   const [incomes, setIncomes] = useState<IncomeItem[]>([{ name: 'Renda principal', amountCents: null }]);
-  const [fixedItems, setFixedItems] = useState<FixedItem[]>([{ name: '', valueCents: null }]);
+  const [fixedItems, setFixedItems] = useState<FixedItem[]>([{ name: '', valueCents: null, dueDay: '' }]);
   const [savingItems, setSavingItems] = useState<SavingItem[]>([{ name: '', targetCents: null, isReserve: false }]);
   const [freeSpendName, setFreeSpendName] = useState('Gastos livres');
   const [wantsPct, setWantsPct] = useState('60');
   const [currentBalanceCents, setCurrentBalanceCents] = useState<number | null>(null);
 
   const futurePct = Math.max(0, 100 - (Number.parseInt(wantsPct, 10) || 0));
+
+  const handlePickAvatar = async () => {
+    const picked = await pickAvatar();
+    if (!picked) return;
+    setAvatarUri(picked); // show immediately
+    const stable = await persistAvatar(picked); // then swap to the stable copy if it worked
+    setAvatarUri(stable);
+  };
 
   const updateIncome = (index: number, patch: Partial<IncomeItem>) => {
     setIncomes((items) => items.map((it, i) => (i === index ? { ...it, ...patch } : it)));
@@ -128,12 +143,15 @@ export default function OnboardingScreen() {
   const finish = async () => {
     setSaving(true);
     try {
+      await upsertProfile({ name: userName.trim() || 'Você', avatarUri });
+
       const validIncomes = incomes.filter((i) => i.name.trim());
       const validFixed = fixedItems.filter((f) => f.name.trim() && f.valueCents != null);
       const validSaving = savingItems.filter((s) => s.name.trim());
 
       const fixedBucketIds: string[] = [];
       for (const item of validFixed) {
+        const parsedDue = Number.parseInt(item.dueDay, 10);
         const id = await createBucket({
           name: item.name.trim(),
           color: colorForIndex(fixedBucketIds.length),
@@ -141,6 +159,7 @@ export default function OnboardingScreen() {
           kind: 'spending',
           fundingType: 'fixed',
           monthlyTargetCents: item.valueCents ?? 0,
+          dueDay: parsedDue >= 1 && parsedDue <= 31 ? parsedDue : undefined,
         });
         fixedBucketIds.push(id);
       }
@@ -222,16 +241,35 @@ export default function OnboardingScreen() {
           entering={(direction === 1 ? SlideInRight : SlideInLeft).duration(260)}
           exiting={(direction === 1 ? SlideOutLeft : SlideOutRight).duration(180)}
         >
-          <View style={styles.iconWrap}>
-            <AnimatedLucideIcon name={STEP_ICON[step]} replayKey={step} />
-          </View>
+          {step !== 0 ? (
+            <View style={styles.iconWrap}>
+              <AnimatedLucideIcon name={STEP_ICON[step]} replayKey={step} />
+            </View>
+          ) : null}
 
           {step === 0 ? (
+            <View style={styles.stepBlock}>
+              <Text style={styles.title}>Oi! Como te chamamos?</Text>
+              <Text style={styles.explain}>Coloque seu nome e, se quiser, uma foto pra deixar seu app com a sua cara.</Text>
+              <View style={styles.avatarWrap}>
+                <AvatarPicker uri={avatarUri} onPress={handlePickAvatar} />
+              </View>
+              <TextInput
+                style={styles.input}
+                placeholder="Seu nome ou apelido"
+                placeholderTextColor={colors.textMuted}
+                value={userName}
+                onChangeText={setUserName}
+              />
+            </View>
+          ) : null}
+
+          {step === 1 ? (
             <View style={styles.stepBlock}>
               <Text style={styles.title}>Suas rendas</Text>
               <Text style={styles.explain}>
                 Quanto cai todo mês, e de onde? Some tudo que é previsível — salário, estágio,
-                mensalidade. É a base que banca seus fixos.
+                mensalidade. É a base que banca suas despesas.
               </Text>
               {incomes.map((item, i) => (
                 <View key={i} style={styles.row}>
@@ -257,12 +295,12 @@ export default function OnboardingScreen() {
             </View>
           ) : null}
 
-          {step === 1 ? (
+          {step === 2 ? (
             <View style={styles.stepBlock}>
-              <Text style={styles.title}>Seus custos fixos</Text>
-              <Text style={styles.explain}>Contas que você tem que pagar todo mês. Elas são cobertas primeiro, sempre.</Text>
+              <Text style={styles.title}>Suas despesas</Text>
+              <Text style={styles.explain}>Contas fixas que você paga todo mês. São cobertas primeiro, sempre.</Text>
               {fixedItems.map((item, i) => (
-                <View key={i} style={styles.row}>
+                <View key={i} style={styles.savingRow}>
                   <TextInput
                     style={[styles.input, styles.flex1]}
                     placeholder="Ex: internet"
@@ -270,48 +308,63 @@ export default function OnboardingScreen() {
                     value={item.name}
                     onChangeText={(v) => updateFixed(i, { name: v })}
                   />
-                  <MoneyInput
-                    style={styles.amountField}
-                    placeholder="R$"
-                    valueCents={item.valueCents}
-                    onChangeCents={(c) => updateFixed(i, { valueCents: c })}
-                  />
+                  <View style={styles.row}>
+                    <MoneyInput
+                      style={styles.flex1}
+                      placeholder="Valor mensal"
+                      valueCents={item.valueCents}
+                      onChangeCents={(c) => updateFixed(i, { valueCents: c })}
+                    />
+                    <TextInput
+                      style={[styles.input, styles.amountField]}
+                      placeholder="Vence dia"
+                      placeholderTextColor={colors.textMuted}
+                      keyboardType="number-pad"
+                      maxLength={2}
+                      value={item.dueDay}
+                      onChangeText={(v) => updateFixed(i, { dueDay: v })}
+                    />
+                  </View>
                 </View>
               ))}
-              <Pressable style={styles.addRow} onPress={() => setFixedItems((items) => [...items, { name: '', valueCents: null }])}>
+              <Pressable style={styles.addRow} onPress={() => setFixedItems((items) => [...items, { name: '', valueCents: null, dueDay: '' }])}>
                 <Ionicons name="add-circle-outline" size={18} color={colors.textPrimary} />
-                <Text style={styles.addLink}>Adicionar outro fixo</Text>
+                <Text style={styles.addLink}>Adicionar outra despesa</Text>
               </Pressable>
             </View>
           ) : null}
 
-          {step === 2 ? (
+          {step === 3 ? (
             <View style={styles.stepBlock}>
-              <Text style={styles.title}>Suas metas</Text>
-              <Text style={styles.explain}>O que você quer guardar? Marque "reserva" pra emergências.</Text>
+              <Text style={styles.title}>Metas e reserva</Text>
+              <Text style={styles.explain}>
+                Metas têm um valor alvo e enchem aos poucos (iPhone, viagem). A reserva é sem
+                prazo — só marque "reserva" e não precisa de alvo.
+              </Text>
               {savingItems.map((item, i) => (
                 <View key={i} style={styles.savingRow}>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Ex: emergência da moto"
-                    placeholderTextColor={colors.textMuted}
-                    value={item.name}
-                    onChangeText={(v) => updateSaving(i, { name: v })}
-                  />
                   <View style={styles.row}>
-                    <MoneyInput
-                      style={styles.flex1}
-                      placeholder="Meta em R$ (opcional)"
-                      valueCents={item.targetCents}
-                      onChangeCents={(c) => updateSaving(i, { targetCents: c })}
+                    <TextInput
+                      style={[styles.input, styles.flex1]}
+                      placeholder={item.isReserve ? 'Ex: reserva de emergência' : 'Ex: iPhone, viagem'}
+                      placeholderTextColor={colors.textMuted}
+                      value={item.name}
+                      onChangeText={(v) => updateSaving(i, { name: v })}
                     />
                     <Pressable
                       style={[styles.reserveToggle, item.isReserve && styles.reserveToggleOn]}
-                      onPress={() => updateSaving(i, { isReserve: !item.isReserve })}
+                      onPress={() => updateSaving(i, { isReserve: !item.isReserve, targetCents: null })}
                     >
                       <Text style={item.isReserve ? styles.reserveTextOn : styles.reserveText}>reserva</Text>
                     </Pressable>
                   </View>
+                  {!item.isReserve ? (
+                    <MoneyInput
+                      placeholder="Valor alvo (ex: R$ 3.500,00)"
+                      valueCents={item.targetCents}
+                      onChangeCents={(c) => updateSaving(i, { targetCents: c })}
+                    />
+                  ) : null}
                 </View>
               ))}
               <Pressable
@@ -324,11 +377,11 @@ export default function OnboardingScreen() {
             </View>
           ) : null}
 
-          {step === 3 ? (
+          {step === 4 ? (
             <View style={styles.stepBlock}>
               <Text style={styles.title}>O que sobra</Text>
               <Text style={styles.explain}>
-                Depois dos fixos, sugerimos {wantsPct}% livre e {futurePct}% pras suas metas.
+                Depois das despesas, sugerimos {wantsPct}% livre e {futurePct}% pras suas metas.
               </Text>
               <TextInput
                 style={styles.input}
@@ -349,7 +402,7 @@ export default function OnboardingScreen() {
             </View>
           ) : null}
 
-          {step === 4 ? (
+          {step === 5 ? (
             <View style={styles.stepBlock}>
               <Text style={styles.title}>Dia zero</Text>
               <Text style={styles.explain}>
@@ -363,7 +416,7 @@ export default function OnboardingScreen() {
             </View>
           ) : null}
 
-          {step === 5 ? (
+          {step === 6 ? (
             <View style={styles.stepBlock}>
               <Text style={styles.title}>Tudo pronto</Text>
               {preview.totalCents > 0 ? (
@@ -435,6 +488,7 @@ const styles = StyleSheet.create({
     gap: spacing.lg,
   },
   iconWrap: { alignItems: 'center', marginBottom: spacing.sm },
+  avatarWrap: { alignItems: 'center', marginVertical: spacing.sm },
   stepBlock: { gap: spacing.md },
   title: { color: colors.textPrimary, fontFamily: fontFamily.bold, fontSize: 26, textAlign: 'center' },
   explain: {
